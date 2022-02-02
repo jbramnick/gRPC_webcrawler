@@ -1,25 +1,27 @@
 from bs4 import BeautifulSoup
 import requests
+from urllib.parse import urlparse
    
-# lists
 urls=[]
    
-# function created
 def scrape(site):
-       
-    # getting the request from url
-    r = requests.get(site)
-       
-    # converting the text
-    s = BeautifulSoup(r.text,"html.parser")
-    print(s)  
-    
-   
-# main function
+
+	r = requests.get(site)
+
+	s = BeautifulSoup(r.text,"html.parser")
+
+	domain = urlparse(site).netloc
+
+	for i in s.find_all("a"):
+		href = i.attrs['href']
+		if href.startswith("/") and href!="/":
+			site = site+href
+			if site not in urls and urlparse(site).netloc==domain: 
+				urls.append(site) 
+				print(site+"\n")
+				scrape(site) 
+
 if __name__ =="__main__":
-   
-    # website to be scrape
-    site="http://example.webscraping.com//"
-   
-    # calling function
-    scrape(site)
+	site="https://crawler-test.com"
+
+	scrape(site)
