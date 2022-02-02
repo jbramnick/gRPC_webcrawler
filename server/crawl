@@ -1,0 +1,46 @@
+#!/usr/bin/python3
+import scrapy
+from scrapy.crawler import CrawlerProcess
+from urllib.parse import urlparse
+import click
+import validators
+
+class Crawler(scrapy.Spider):
+	name = 'crawler'
+
+	def parse(self, response):
+		print (response.url)
+		urls = response.css('a::attr(href)').extract()
+		for url in urls:
+			yield response.follow(url, callback=self.parse)
+@click.command()
+@click.option('-start')
+@click.option('-stop')
+@click.option('-list')
+def main(start,stop,list):
+	"""
+	Simple crawler CLI
+	"""
+	optlist = []
+	optlist.append(list) if list is not None else None
+	optlist.append(stop) if stop is not None else None
+	optlist.append(start) if start is not None else None
+	if len(optlist) != 1:
+		print ("Please use at least and no more than one option use --help for more info")
+		return
+	site = optlist[0]
+	if not validators.url(site):	
+		print ("Please use a valid URL")
+		return
+	#call to gRPC server
+	#if(start):
+	#if(stop):
+	#if(list):
+	domain = urlparse(site).netloc
+	Crawler.custom_settings = {'RETRY_TIMES':0,'LOG_ENABLED':False}
+	process = CrawlerProcess()
+	process.crawl(Crawler, start_urls=[site], allowed_domains = [domain])
+	process.start()
+
+if __name__ == "__main__":
+	main()
