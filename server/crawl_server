@@ -74,12 +74,12 @@ class Crawler(crawler_pb2_grpc.CrawlerServicer):
 		domain = urlparse(request.url).netloc
 		domainName = domain.replace(".com","").replace("www.","")
 		cat=""
-		#try:
-		f = open(domainName+'.json',"r")
-		for line in f:
-			cat+=line+"\n"
-		#except:
-			#cat = "Could not open recent crawl for "+domainName+" please start a new crawl"
+		try:
+			f = open(domainName+'.json',"r")
+			for line in f:
+				cat+=line+"\n"
+		except:
+			cat = "Could not open recent crawl for "+domainName+" please start a new crawl"
 		return crawler_pb2.Reply(reply=cat)
 def run_spider(spider,site,domain):
 	def f(q):
