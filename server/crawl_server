@@ -1,0 +1,128 @@
+#!/usr/bin/python3
+import scrapy
+import scrapy.crawler as crawler
+from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerRunner
+from urllib.parse import urlparse
+from concurrent import futures
+from twisted.internet import reactor
+from multiprocessing import Process, Queue
+import threading
+import logging
+import validators
+import grpc
+import crawler_pb2
+import crawler_pb2_grpc
+import json
+
+threads={}
+class ScrapyCrawler(scrapy.Spider):
+	name = 'crawler'
+
+	def parse(self, response):
+		urls = response.css('a::attr(href)').extract()
+		for url in urls:
+			if url!="/" and url!="#":
+				yield {'url':response.urljoin(url)}
+			yield response.follow(url, callback=self.parse)
+			
+class Crawler(crawler_pb2_grpc.CrawlerServicer):
+	def start(self, request, context):
+		cleanup()
+		lock = threading.Lock()
+		lock.acquire()
+		site=request.url
+		domain = urlparse(site).netloc
+		domainName = domain.replace(".com","").replace("www.","")
+		if domainName in threads.values():
+			msg = "Crawler for ("+domain+") already in progress. please use -running for a list of running crawlers"
+			lock.release()
+			return crawler_pb2.Reply(reply=msg)
+		lock.release()
+		f = open(domainName+'.json',"w+")
+		f.close()
+		ScrapyCrawler.custom_settings = {'RETRY_TIMES':0,
+		'FEED_URI': domainName + '.json',
+		'FEED_FORMAT': 'json',
+		'FEED_EXPORTERS': {
+		    'json': 'scrapy.exporters.JsonItemExporter',
+		},
+		'FEED_EXPORT_ENCODING': 'utf-8'
+		}
+		threads.update(run_spider(ScrapyCrawler,site,domain))
+		msg = "Cralwer started for " + site + " and domain restricted to " + domain
+		return crawler_pb2.Reply(reply=msg)
+	def stop(self, request, context):
+		site = request.url
+		cleanup()
+		lock = threading.Lock()
+		lock.acquire()
+		domain = urlparse(site).netloc
+		domainName = domain.replace(".com","").replace("www.","")
+		p = getKey(domainName)
+		msg = ""
+		if p is not None:
+			if p.is_alive():
+				p.terminate()
+			msg = site + " crawl terminated"
+		else:
+			msg = "No current crawl for "+site
+		cleanup()
+		lock.release()
+		return crawler_pb2.Reply(reply=msg)
+	def list(self, request, context):
+		domain = urlparse(request.url).netloc
+		domainName = domain.replace(".com","").replace("www.","")
+		cat=""
+		#try:
+		f = open(domainName+'.json',"r")
+		for line in f:
+			cat+=line+"\n"
+		#except:
+			#cat = "Could not open recent crawl for "+domainName+" please start a new crawl"
+		return crawler_pb2.Reply(reply=cat)
+def run_spider(spider,site,domain):
+	def f(q):
+		try:
+			runner = crawler.CrawlerRunner()
+			deferred = runner.crawl(spider, start_urls=[site], allowed_domains = [domain])
+			deferred.addBoth(lambda _: reactor.stop())
+			reactor.run()
+			q.put(None)
+		except Exception as e:
+			q.put(e)
+
+	q = Queue()
+	p = Process(target=f, args=(q,))
+	p.start()
+	domain = urlparse(site).netloc
+	domainName = domain.replace(".com","").replace("www.","")
+	return {p:domainName}
+def cleanup():
+	lock = threading.Lock()
+	lock.acquire()
+	threadsToKill = []
+	for p in threads.keys():
+		if not p.is_alive():
+			threadsToKill.append(p)
+	for p in threadsToKill:
+		del threads[p]
+	lock.release()
+def getKey(val):
+	lock = threading.Lock()
+	lock.acquire()
+	for key,value in threads.items():
+		if val == value:
+			return key
+		return None
+	lock.release()
+def serve():
+	server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+	crawler_pb2_grpc.add_CrawlerServicer_to_server(Crawler(), server)
+	server.add_insecure_port('[::]:50051')
+	server.start()
+	server.wait_for_termination()
+
+if __name__ == "__main__":
+	logging.basicConfig()
+	serve()

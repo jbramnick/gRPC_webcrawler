@@ -1,0 +1,12 @@
+service Crawler {
+	rpc start (Request) returns (Reply) {}
+	rpc stop (Request) returns (Reply) {}
+	rpc list (Request) returns (Reply) {}
+}
+message Request {
+	required string url = 1;
+}
+
+message Reply {
+	required string reply = 1;
+}

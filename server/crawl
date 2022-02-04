@@ -1,18 +1,15 @@
 #!/usr/bin/python3
-import scrapy
-from scrapy.crawler import CrawlerProcess
-from urllib.parse import urlparse
+from __future__ import print_function
 import click
 import validators
+import logging
+import grpc
+import crawler_pb2
+import crawler_pb2_grpc
 
-class Crawler(scrapy.Spider):
-	name = 'crawler'
 
-	def parse(self, response):
-		print (response.url)
-		urls = response.css('a::attr(href)').extract()
-		for url in urls:
-			yield response.follow(url, callback=self.parse)
+
+
 @click.command()
 @click.option('-start')
 @click.option('-stop')
@@ -28,19 +25,22 @@ def main(start,stop,list):
 	if len(optlist) != 1:
 		print ("Please use at least and no more than one option use --help for more info")
 		return
-	site = optlist[0]
-	if not validators.url(site):	
-		print ("Please use a valid URL")
-		return
 	#call to gRPC server
-	#if(start):
-	#if(stop):
-	#if(list):
-	domain = urlparse(site).netloc
-	Crawler.custom_settings = {'RETRY_TIMES':0,'LOG_ENABLED':False}
-	process = CrawlerProcess()
-	process.crawl(Crawler, start_urls=[site], allowed_domains = [domain])
-	process.start()
-
+	with grpc.insecure_channel('localhost:50051') as channel:
+		stub = crawler_pb2_grpc.CrawlerStub(channel)
+		site = optlist[0]
+		if not validators.url(site):	
+			print ("Please use a valid URL")
+			return
+		if(start):
+			 response = stub.start(crawler_pb2.Request(url=site))
+			 print (response)
+		if(stop):
+			 response = stub.stop(crawler_pb2.Request(url=site))
+			 print (response)
+		if(list):
+			 response = stub.list(crawler_pb2.Request(url=site))
+			 print (response)
 if __name__ == "__main__":
+	logging.basicConfig()
 	main()
