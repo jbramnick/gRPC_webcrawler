@@ -15,4 +15,4 @@ COPY crawler_pb2_grpc.py /app
 
 COPY crawler_pb2.py /app
 
-CMD python3 /app/crawl_server
+CMD python3 /app/crawl_serve
