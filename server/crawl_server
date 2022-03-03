@@ -9,13 +9,12 @@ from twisted.internet import reactor
 from multiprocessing import Process, Queue
 import threading
 import logging
-import validators
 import grpc
 import crawler_pb2
 import crawler_pb2_grpc
-import json
 
 threads={}
+lock = threading.Lock()
 class ScrapyCrawler(scrapy.Spider):
 	name = 'crawler'
 
@@ -29,7 +28,6 @@ class ScrapyCrawler(scrapy.Spider):
 class Crawler(crawler_pb2_grpc.CrawlerServicer):
 	def start(self, request, context):
 		cleanup()
-		lock = threading.Lock()
 		lock.acquire()
 		site=request.url
 		domain = urlparse(site).netloc
@@ -55,7 +53,6 @@ class Crawler(crawler_pb2_grpc.CrawlerServicer):
 	def stop(self, request, context):
 		site = request.url
 		cleanup()
-		lock = threading.Lock()
 		lock.acquire()
 		domain = urlparse(site).netloc
 		domainName = domain.replace(".com","").replace("www.","")
@@ -99,7 +96,6 @@ def run_spider(spider,site,domain):
 	domainName = domain.replace(".com","").replace("www.","")
 	return {p:domainName}
 def cleanup():
-	lock = threading.Lock()
 	lock.acquire()
 	threadsToKill = []
 	for p in threads.keys():
@@ -109,7 +105,6 @@ def cleanup():
 		del threads[p]
 	lock.release()
 def getKey(val):
-	lock = threading.Lock()
 	lock.acquire()
 	for key,value in threads.items():
 		if val == value:

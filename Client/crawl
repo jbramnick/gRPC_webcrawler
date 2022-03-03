@@ -33,14 +33,14 @@ def main(start,stop,list):
 			print ("Please use a valid URL")
 			return
 		if(start):
-			 response = stub.start(crawler_pb2.Request(url=site))
-			 print (response)
+			response = stub.start(crawler_pb2.Request(url=site))
+			print (response)
 		if(stop):
-			 response = stub.stop(crawler_pb2.Request(url=site))
-			 print (response)
+			response = stub.stop(crawler_pb2.Request(url=site))
+			print (response)
 		if(list):
-			 response = stub.list(crawler_pb2.Request(url=site))
-			 print (response)
+			response = stub.list(crawler_pb2.Request(url=site))
+			print (response)
 if __name__ == "__main__":
 	logging.basicConfig()
 	main()
